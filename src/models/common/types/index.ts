@@ -14,6 +14,7 @@ export interface IUser {
 export interface IPost {
   _id?: string;
   userId: mongoose.Types.ObjectId;
+  title: string;
   src: string;
   comments: mongoose.Types.ObjectId[];
   like: number;

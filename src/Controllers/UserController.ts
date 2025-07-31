@@ -19,7 +19,8 @@ export class UserController {
       }
 
       const user = await this.userService.createUser({ username, name, password, email });
-      res.status(201).json({ message: 'User created successfully', user });
+      const { token } = await this.userService.loginUser(email, password);
+      res.status(201).json({ message: 'User created successfully', user, token });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import {IUser} from "@src/models/common/types";
 import {IUserDocument, User} from '@src/models/User';
+import ENV from '@src/common/constants/ENV';
 
 export class UserService {
   async createUser(userData: IUser): Promise<IUserDocument> {
@@ -24,7 +25,7 @@ export class UserService {
 
     const token = jwt.sign(
         { userId: user._id, username: user.username },
-        process.env.JWT_SECRET || 'fallback_secret',
+        ENV.Jwt,
         { expiresIn: '1h' }
     );
 

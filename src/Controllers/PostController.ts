@@ -1,133 +1,132 @@
 import { Request, Response } from 'express';
-import {AuthRequest} from "@src/models/common/types";
-import {PostService} from "@src/services/PostService";
-import mongoose from "mongoose";
+import {AuthRequest} from '@src/models/common/types';
+import {PostService} from '@src/services/PostService';
+import mongoose from 'mongoose';
 
 export class PostController {
-    private postService: PostService;
+  private postService: PostService;
 
-    constructor() {
-        this.postService = new PostService();
+  constructor() {
+    this.postService = new PostService();
+  }
+
+  createPost = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const { src,title } = req.body;
+
+      if (!src) {
+        res.status(400).json({ message: 'Source is required' });
+        return;
+      }
+
+      const userId = new mongoose.Types.ObjectId(req.user!.userId);
+
+      const post = await this.postService.createPost({
+        userId: userId,
+        src, title,
+        comments: [],
+        like: 0,
+        views: 0,
+      });
+
+      res.status(201).json({ message: 'Post created successfully', post });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
     }
+  };
 
-    createPost = async (req: AuthRequest, res: Response): Promise<void> => {
-        try {
-            const { src } = req.body;
+  getPost = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const post = await this.postService.getPostById(id);
 
-            if (!src) {
-                res.status(400).json({ message: 'Source is required' });
-                return;
-            }
+      if (!post) {
+        res.status(404).json({ message: 'Post not found' });
+        return;
+      }
 
-            const userId = new mongoose.Types.ObjectId(req.user!.userId);
+      await this.postService.incrementViews(id);
 
-            const post = await this.postService.createPost({
-                userId: userId,
-                src,
-                comments: [],
-                like: 0,
-                views: 0
-            });
+      res.json({ post });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  };
 
-            res.status(201).json({ message: 'Post created successfully', post });
-        } catch (error: any) {
-            res.status(400).json({ message: error.message });
-        }
-    };
+  getAllPosts = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
 
-    getPost = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const { id } = req.params;
-            const post = await this.postService.getPostById(id);
+      const posts = await this.postService.getAllPosts(page, limit);
+      res.json({ posts, page, limit });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  };
 
-            if (!post) {
-                res.status(404).json({ message: 'Post not found' });
-                return;
-            }
+  getUserPosts = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { userId } = req.params;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
 
-            // Increment views
-            await this.postService.incrementViews(id);
+      const posts = await this.postService.getPostsByUserId(userId, page, limit);
+      res.json({ posts, page, limit });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  };
 
-            res.json({ post });
-        } catch (error: any) {
-            res.status(500).json({ message: error.message });
-        }
-    };
+  updatePost = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { src } = req.body;
 
-    getAllPosts = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 10;
+      const post = await this.postService.updatePost(id, { src });
 
-            const posts = await this.postService.getAllPosts(page, limit);
-            res.json({ posts, page, limit });
-        } catch (error: any) {
-            res.status(500).json({ message: error.message });
-        }
-    };
+      if (!post) {
+        res.status(404).json({ message: 'Post not found' });
+        return;
+      }
 
-    getUserPosts = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const { userId } = req.params;
-            const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 10;
+      res.json({ message: 'Post updated successfully', post });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  };
 
-            const posts = await this.postService.getPostsByUserId(userId, page, limit);
-            res.json({ posts, page, limit });
-        } catch (error: any) {
-            res.status(500).json({ message: error.message });
-        }
-    };
+  deletePost = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const deleted = await this.postService.deletePost(id);
 
-    updatePost = async (req: AuthRequest, res: Response): Promise<void> => {
-        try {
-            const { id } = req.params;
-            const { src } = req.body;
+      if (!deleted) {
+        res.status(404).json({ message: 'Post not found' });
+        return;
+      }
 
-            const post = await this.postService.updatePost(id, { src });
+      res.json({ message: 'Post deleted successfully' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  };
 
-            if (!post) {
-                res.status(404).json({ message: 'Post not found' });
-                return;
-            }
+  likePost = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { increment } = req.body;
 
-            res.json({ message: 'Post updated successfully', post });
-        } catch (error: any) {
-            res.status(400).json({ message: error.message });
-        }
-    };
+      const post = await this.postService.toggleLike(id, increment);
 
-    deletePost = async (req: AuthRequest, res: Response): Promise<void> => {
-        try {
-            const { id } = req.params;
-            const deleted = await this.postService.deletePost(id);
+      if (!post) {
+        res.status(404).json({ message: 'Post not found' });
+        return;
+      }
 
-            if (!deleted) {
-                res.status(404).json({ message: 'Post not found' });
-                return;
-            }
-
-            res.json({ message: 'Post deleted successfully' });
-        } catch (error: any) {
-            res.status(500).json({ message: error.message });
-        }
-    };
-
-    likePost = async (req: AuthRequest, res: Response): Promise<void> => {
-        try {
-            const { id } = req.params;
-            const { increment } = req.body;
-
-            const post = await this.postService.toggleLike(id, increment);
-
-            if (!post) {
-                res.status(404).json({ message: 'Post not found' });
-                return;
-            }
-
-            res.json({ message: 'Post like updated', post });
-        } catch (error: any) {
-            res.status(500).json({ message: error.message });
-        }
-    };
+      res.json({ message: 'Post like updated', post });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  };
 }

@@ -9,6 +9,10 @@ const PostSchema = new Schema<IPostDocument>({
     ref: 'User',
     required: true,
   },
+  title: {
+    type: String,
+    required: true,
+  },
   src: {
     type: String,
     required: true,
