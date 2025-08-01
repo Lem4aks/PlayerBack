@@ -12,10 +12,25 @@ export class PostController {
 
   createPost = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const { src,title } = req.body;
+      const { title, type, description, src, content } = req.body;
 
-      if (!src) {
-        res.status(400).json({ message: 'Source is required' });
+      if (!title || !type) {
+        res.status(400).json({ message: 'Title and type are required' });
+        return;
+      }
+
+      if (!['video', 'image', 'text'].includes(type)) {
+        res.status(400).json({ message: 'Type must be video, image, or text' });
+        return;
+      }
+
+      if ((type === 'video' || type === 'image') && !src) {
+        res.status(400).json({ message: 'Source is required for video and image posts' });
+        return;
+      }
+
+      if (type === 'text' && !content) {
+        res.status(400).json({ message: 'Content is required for text posts' });
         return;
       }
 
@@ -23,7 +38,11 @@ export class PostController {
 
       const post = await this.postService.createPost({
         userId: userId,
-        src, title,
+        title,
+        type,
+        description,
+        src,
+        content,
         comments: [],
         like: 0,
         views: 0,
@@ -56,7 +75,7 @@ export class PostController {
   getAllPosts = async (req: Request, res: Response): Promise<void> => {
     try {
       const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 10;
+      const limit = parseInt(req.query.limit as string) || 50;
 
       const posts = await this.postService.getAllPosts(page, limit);
       res.json({ posts, page, limit });
@@ -81,9 +100,31 @@ export class PostController {
   updatePost = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
-      const { src } = req.body;
+      const { title, type, description, src, content } = req.body;
 
-      const post = await this.postService.updatePost(id, { src });
+      if (type && !['video', 'image', 'text'].includes(type)) {
+        res.status(400).json({ message: 'Type must be video, image, or text' });
+        return;
+      }
+
+      if (type === 'text' && !content && !src) {
+        res.status(400).json({ message: 'Content is required for text posts' });
+        return;
+      }
+
+      if ((type === 'video' || type === 'image') && !src) {
+        res.status(400).json({ message: 'Source is required for video and image posts' });
+        return;
+      }
+
+      const updateData: any = {};
+      if (title !== undefined) updateData.title = title;
+      if (type !== undefined) updateData.type = type;
+      if (description !== undefined) updateData.description = description;
+      if (src !== undefined) updateData.src = src;
+      if (content !== undefined) updateData.content = content;
+
+      const post = await this.postService.updatePost(id, updateData);
 
       if (!post) {
         res.status(404).json({ message: 'Post not found' });

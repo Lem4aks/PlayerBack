@@ -13,9 +13,22 @@ const PostSchema = new Schema<IPostDocument>({
     type: String,
     required: true,
   },
+  type: {
+    type: String,
+    enum: ['video', 'image', 'text'],
+    required: true,
+  },
+  description: {
+    type: String,
+    required: false,
+  },
   src: {
     type: String,
-    required: true,
+    required: false,
+  },
+  content: {
+    type: String,
+    required: false,
   },
   comments: [{
     type: Schema.Types.ObjectId,
