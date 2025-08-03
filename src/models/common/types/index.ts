@@ -33,7 +33,6 @@ export interface IComment {
   parentCommentId?: mongoose.Types.ObjectId;
   content: string;
   like: number;
-  replies: mongoose.Types.ObjectId[];
   createdAt?: Date;
   updatedAt?: Date;
 }

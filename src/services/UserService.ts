@@ -1,12 +1,12 @@
 import jwt from 'jsonwebtoken';
-import {IUser} from "@src/models/common/types";
+import {IUser} from '@src/models/common/types';
 import {IUserDocument, User} from '@src/models/User';
 import ENV from '@src/common/constants/ENV';
 
 export class UserService {
   async createUser(userData: IUser): Promise<IUserDocument> {
     const existingUser = await User.findOne({
-      $or: [{ email: userData.email }, { username: userData.username }]
+      $or: [{ email: userData.email }, { username: userData.username }],
     });
 
     if (existingUser) {
@@ -17,16 +17,16 @@ export class UserService {
     return await user.save();
   }
 
-  async loginUser(email: string, password: string): Promise<{ user: IUserDocument; token: string }> {
+  async loginUser(email: string, password: string): Promise<{ user: IUserDocument, token: string }> {
     const user = await User.findOne({ email });
     if (!user || !(await user.comparePassword(password))) {
       throw new Error('Invalid credentials');
     }
 
     const token = jwt.sign(
-        { userId: user._id, username: user.username },
-        ENV.Jwt,
-        { expiresIn: '1h' }
+      { userId: user._id, username: user.username },
+      ENV.Jwt,
+      { expiresIn: '1h' },
     );
 
     return { user, token };

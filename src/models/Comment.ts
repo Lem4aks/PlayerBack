@@ -27,10 +27,7 @@ const CommentSchema = new Schema<ICommentDocument>({
     default: 0,
     min: 0,
   },
-  replies: [{
-    type: Schema.Types.ObjectId,
-    ref: 'Comment',
-  }],
+
 }, {
   timestamps: true,
 });

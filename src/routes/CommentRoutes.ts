@@ -8,6 +8,7 @@ const commentController = new CommentController();
 router.post('/', authMiddleware, commentController.createComment);
 router.get('/:id', commentController.getComment);
 router.get('/post/:postId', commentController.getPostComments);
+router.get('/:parentCommentId/replies', commentController.getReplies);
 router.put('/:id', authMiddleware, commentController.updateComment);
 router.delete('/:id', authMiddleware, commentController.deleteComment);
 router.patch('/:id/like', authMiddleware, commentController.likeComment);
