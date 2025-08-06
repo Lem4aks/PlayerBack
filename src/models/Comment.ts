@@ -22,12 +22,10 @@ const CommentSchema = new Schema<ICommentDocument>({
     required: true,
     maxlength: 1000,
   },
-  like: {
-    type: Number,
-    default: 0,
-    min: 0,
-  },
-
+  likes: [{
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+  }],
 }, {
   timestamps: true,
 });

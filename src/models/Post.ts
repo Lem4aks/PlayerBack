@@ -34,18 +34,17 @@ const PostSchema = new Schema<IPostDocument>({
     type: Schema.Types.ObjectId,
     ref: 'Comment',
   }],
-  like: {
-    type: Number,
-    default: 0,
-    min: 0,
-  },
-  views: {
-    type: Number,
-    default: 0,
-    min: 0,
-  },
+  likes: [{
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+  }],
+  views: [{
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+  }],
 }, {
   timestamps: true,
 });
+
 
 export const Post = mongoose.model<IPostDocument>('Post', PostSchema);

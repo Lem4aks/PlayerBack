@@ -44,8 +44,8 @@ export class PostController {
         src,
         content,
         comments: [],
-        like: 0,
-        views: 0,
+        likes: [],
+        views: [],
       });
 
       res.status(201).json({ message: 'Post created successfully', post });
@@ -54,9 +54,11 @@ export class PostController {
     }
   };
 
-  getPost = async (req: Request, res: Response): Promise<void> => {
+  recordView = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
+      const userId = req.user?.userId;
+
       const post = await this.postService.getPostById(id);
 
       if (!post) {
@@ -64,9 +66,74 @@ export class PostController {
         return;
       }
 
-      await this.postService.incrementViews(id);
+      if (userId) {
+        const alreadyViewed = await this.postService.hasUserViewed(id, userId);
 
-      res.json({ post });
+        if (!alreadyViewed) {
+          await this.postService.incrementViews(id, userId);
+
+          const viewCount = await this.postService.getViewCount(id);
+
+          res.json({
+            message: 'View recorded successfully',
+            viewCount,
+            postId: id,
+            success: true,
+          });
+        } else {
+          const viewCount = await this.postService.getViewCount(id);
+          res.json({
+            message: 'Post already viewed by user',
+            viewCount,
+            postId: id,
+            success: false,
+          });
+        }
+      } else {
+        const viewCount = await this.postService.getViewCount(id);
+        res.json({
+          message: 'View not recorded - user not authenticated',
+          viewCount,
+          postId: id,
+          success: false,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error recording view:', error);
+      res.status(500).json({ message: error.message, success: false });
+    }
+  };
+
+  getPost = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.userId;
+
+      const post = await this.postService.getPostById(id);
+
+      if (!post) {
+        res.status(404).json({ message: 'Post not found' });
+        return;
+      }
+
+      if (userId) {
+        await this.postService.incrementViews(id, userId);
+      }
+
+      const responseData: any = { post };
+      if (userId) {
+        responseData.userInteraction = {
+          hasLiked: await this.postService.hasUserLiked(id, userId),
+          hasViewed: await this.postService.hasUserViewed(id, userId),
+        };
+      }
+
+      responseData.counts = {
+        likes: await this.postService.getLikeCount(id),
+        views: await this.postService.getViewCount(id),
+      };
+
+      res.json(responseData);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -75,10 +142,19 @@ export class PostController {
   getAllPosts = async (req: Request, res: Response): Promise<void> => {
     try {
       const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 50;
+      const limit = parseInt(req.query.limit as string) || 2;
 
       const posts = await this.postService.getAllPosts(page, limit);
-      res.json({ posts, page, limit });
+
+      const postsWithCounts = await Promise.all(
+        posts.map(async (post) => ({
+          ...post.toObject(),
+          likesCount: post.likes.length,
+          viewsCount: post.views.length,
+        })),
+      );
+
+      res.json({ posts: postsWithCounts, page, limit });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -88,10 +164,19 @@ export class PostController {
     try {
       const { userId } = req.params;
       const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 10;
+      const limit = parseInt(req.query.limit as string) || 2;
 
       const posts = await this.postService.getPostsByUserId(userId, page, limit);
-      res.json({ posts, page, limit });
+
+      const postsWithCounts = await Promise.all(
+        posts.map(async (post) => ({
+          ...post.toObject(),
+          likesCount: post.likes.length,
+          viewsCount: post.views.length,
+        })),
+      );
+
+      res.json({ posts: postsWithCounts, page, limit });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -156,16 +241,30 @@ export class PostController {
   likePost = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
-      const { increment } = req.body;
+      const { isLiking } = req.body;
+      const userId = req.user!.userId;
 
-      const post = await this.postService.toggleLike(id, increment);
+      if (typeof isLiking !== 'boolean') {
+        res.status(400).json({ message: 'isLiking must be a boolean value' });
+        return;
+      }
+
+      const post = await this.postService.toggleLike(id, userId, isLiking);
 
       if (!post) {
         res.status(404).json({ message: 'Post not found' });
         return;
       }
 
-      res.json({ message: 'Post like updated', post });
+      const likesCount = await this.postService.getLikeCount(id);
+      const hasLiked = await this.postService.hasUserLiked(id, userId);
+
+      res.json({
+        message: `Post ${isLiking ? 'liked' : 'unliked'} successfully`,
+        post,
+        likesCount,
+        hasLiked,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

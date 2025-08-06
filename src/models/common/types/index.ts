@@ -20,8 +20,8 @@ export interface IPost {
   src?: string;
   content?: string;
   comments: mongoose.Types.ObjectId[];
-  like: number;
-  views: number;
+  likes: mongoose.Types.ObjectId[];
+  views: mongoose.Types.ObjectId[];
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -32,7 +32,7 @@ export interface IComment {
   postId?: mongoose.Types.ObjectId;
   parentCommentId?: mongoose.Types.ObjectId;
   content: string;
-  like: number;
+  likes: mongoose.Types.ObjectId[];
   createdAt?: Date;
   updatedAt?: Date;
 }

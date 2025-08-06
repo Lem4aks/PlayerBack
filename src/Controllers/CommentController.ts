@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import {Response } from 'express';
 import {AuthRequest} from '@src/models/common/types';
 import {CommentService} from '@src/services/CommentService';
 import mongoose from 'mongoose';
@@ -31,7 +31,7 @@ export class CommentController {
         content,
         postId,
         parentCommentId,
-        like: 0,
+        likes: [],
       });
 
       res.status(201).json({ message: 'Comment created successfully', comment });
@@ -40,9 +40,11 @@ export class CommentController {
     }
   };
 
-  getComment = async (req: Request, res: Response): Promise<void> => {
+  getComment = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
+      const userId = req.user?.userId;
+
       const comment = await this.commentService.getCommentById(id);
 
       if (!comment) {
@@ -50,25 +52,68 @@ export class CommentController {
         return;
       }
 
-      res.json({ comment });
+      const responseData: any = { comment };
+
+      if (userId) {
+        responseData.userInteraction = {
+          hasLiked: await this.commentService.hasUserLiked(id, userId),
+        };
+      }
+
+      responseData.counts = {
+        likes: await this.commentService.getLikeCount(id),
+      };
+
+      res.json(responseData);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   };
 
-  getPostComments = async (req: Request, res: Response): Promise<void> => {
+  getPostComments = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { postId } = req.params;
-      const comments = await this.commentService.getCommentsByPostId(postId);
-      res.json({ comments });
+      const { page = '1', limit = '10' } = req.query;
+      const userId = req.user?.userId;
+
+      const pageNum = parseInt(page as string, 10);
+      const limitNum = parseInt(limit as string, 10);
+
+      if (pageNum < 1 || limitNum < 1 || limitNum > 100) {
+        res.status(400).json({ message: 'Invalid pagination parameters' });
+        return;
+      }
+
+      const result = await this.commentService.getCommentsByPostId(postId, pageNum, limitNum);
+
+      const commentsWithCounts = await Promise.all(
+        result.comments.map(async (comment) => {
+          const commentData: any = {
+            ...comment.toObject(),
+            likesCount: comment.likes.length,
+          };
+
+          if (userId) {
+            commentData.hasLiked = await this.commentService.hasUserLiked(comment._id.toString(), userId);
+          }
+
+          return commentData;
+        }),
+      );
+
+      res.json({
+        ...result,
+        comments: commentsWithCounts,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   };
 
-  getReplies = async (req: Request, res: Response): Promise<void> => {
+  getReplies = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { parentCommentId } = req.params;
+      const userId = req.user?.userId;
 
       if (!parentCommentId) {
         res.status(400).json({ message: 'Parent comment ID is required' });
@@ -76,7 +121,23 @@ export class CommentController {
       }
 
       const replies = await this.commentService.getRepliesByParentId(parentCommentId);
-      res.json({ replies });
+
+      const repliesWithCounts = await Promise.all(
+        replies.map(async (reply) => {
+          const replyData: any = {
+            ...reply.toObject(),
+            likesCount: reply.likes.length,
+          };
+
+          if (userId) {
+            replyData.hasLiked = await this.commentService.hasUserLiked(reply._id.toString(), userId);
+          }
+
+          return replyData;
+        }),
+      );
+
+      res.json({ replies: repliesWithCounts });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -119,16 +180,30 @@ export class CommentController {
   likeComment = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
-      const { increment } = req.body;
+      const { isLiking } = req.body;
+      const userId = req.user!.userId;
 
-      const comment = await this.commentService.toggleLike(id, increment);
+      if (typeof isLiking !== 'boolean') {
+        res.status(400).json({ message: 'isLiking must be a boolean value' });
+        return;
+      }
+
+      const comment = await this.commentService.toggleLike(id, userId, isLiking);
 
       if (!comment) {
         res.status(404).json({ message: 'Comment not found' });
         return;
       }
 
-      res.json({ message: 'Comment like updated', comment });
+      const likesCount = await this.commentService.getLikeCount(id);
+      const hasLiked = await this.commentService.hasUserLiked(id, userId);
+
+      res.json({
+        message: `Comment ${isLiking ? 'liked' : 'unliked'} successfully`,
+        comment,
+        likesCount,
+        hasLiked,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

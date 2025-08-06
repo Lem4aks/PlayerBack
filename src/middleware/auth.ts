@@ -32,3 +32,29 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
     res.status(403).json({ message: 'Access denied. Invalid token.' });
   }
 };
+
+export const userAuthMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
+  const authHeader = req.header('Authorization');
+
+  if (!authHeader) {
+    req.user = undefined;
+    return next();
+  }
+
+  const tokenParts = authHeader.split(' ');
+  if (tokenParts.length !== 2 || tokenParts[0] !== 'Bearer') {
+    req.user = undefined;
+    return next();
+  }
+
+  const token = tokenParts[1];
+
+  try {
+    const decodedPayload = jwt.verify(token, JWT_SECRET);
+    req.user = decodedPayload as { userId: string, username: string };
+    next();
+  } catch (error) {
+    req.user = undefined;
+    next();
+  }
+};
