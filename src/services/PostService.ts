@@ -11,14 +11,7 @@ export class PostService {
 
   async getPostById(id: string): Promise<IPostDocument | null> {
     return await Post.findById(id)
-        .populate('userId', 'username name')
-        .populate({
-          path: 'comments',
-          populate: {
-            path: 'userId',
-            select: 'username name',
-          },
-        });
+        .populate('userId', 'username name');
   }
 
   async getAllPosts(page = 1, limit = 10): Promise<IPostDocument[]> {
@@ -104,5 +97,9 @@ export class PostService {
   async getViewCount(postId: string): Promise<number> {
     const post = await Post.findById(postId).select('views');
     return post ? post.views.length : 0;
+  }
+
+  async getCommentCount(postId: string): Promise<number> {
+    return await Comment.countDocuments({ postId, parentCommentId: null });
   }
 }

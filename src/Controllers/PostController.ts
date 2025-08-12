@@ -43,12 +43,16 @@ export class PostController {
         description,
         src,
         content,
-        comments: [],
         likes: [],
         views: [],
       });
 
-      res.status(201).json({ message: 'Post created successfully', post });
+      const populatedPost = await this.postService.getPostById((post as any)._id.toString());
+
+      res.status(201).json({ 
+        message: 'Post created successfully', 
+        post: populatedPost 
+      });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -123,14 +127,15 @@ export class PostController {
       const responseData: any = { post };
       if (userId) {
         responseData.userInteraction = {
-          hasLiked: await this.postService.hasUserLiked(id, userId),
-          hasViewed: await this.postService.hasUserViewed(id, userId),
+          isLiked: await this.postService.hasUserLiked(id, userId),
+          isViewed: await this.postService.hasUserViewed(id, userId),
         };
       }
 
       responseData.counts = {
         likes: await this.postService.getLikeCount(id),
         views: await this.postService.getViewCount(id),
+        comments: await this.postService.getCommentCount(id),
       };
 
       res.json(responseData);
@@ -147,11 +152,18 @@ export class PostController {
       const posts = await this.postService.getAllPosts(page, limit);
 
       const postsWithCounts = await Promise.all(
-        posts.map(async (post) => ({
-          ...post.toObject(),
-          likesCount: post.likes.length,
-          viewsCount: post.views.length,
-        })),
+        posts.map(async (post) => {
+          const counts = {
+            likes: await this.postService.getLikeCount(post._id.toString()),
+            views: await this.postService.getViewCount(post._id.toString()),
+            comments: await this.postService.getCommentCount(post._id.toString()),
+          };
+          
+          return {
+            ...post.toObject(),
+            counts,
+          };
+        }),
       );
 
       res.json({ posts: postsWithCounts, page, limit });
@@ -169,11 +181,18 @@ export class PostController {
       const posts = await this.postService.getPostsByUserId(userId, page, limit);
 
       const postsWithCounts = await Promise.all(
-        posts.map(async (post) => ({
-          ...post.toObject(),
-          likesCount: post.likes.length,
-          viewsCount: post.views.length,
-        })),
+        posts.map(async (post) => {
+          const counts = {
+            likes: await this.postService.getLikeCount(post._id.toString()),
+            views: await this.postService.getViewCount(post._id.toString()),
+            comments: await this.postService.getCommentCount(post._id.toString()),
+          };
+          
+          return {
+            ...post.toObject(),
+            counts,
+          };
+        }),
       );
 
       res.json({ posts: postsWithCounts, page, limit });

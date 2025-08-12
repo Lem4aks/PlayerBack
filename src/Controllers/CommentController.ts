@@ -52,16 +52,22 @@ export class CommentController {
         return;
       }
 
-      const responseData: any = { comment };
+      const [childCount, userInteraction] = await Promise.all([
+        this.commentService.getChildCommentCount(id),
+        userId ? {
+          isLiked: await this.commentService.hasUserLiked(id, userId),
+        } : {},
+      ]);
 
-      if (userId) {
-        responseData.userInteraction = {
-          hasLiked: await this.commentService.hasUserLiked(id, userId),
-        };
-      }
-
-      responseData.counts = {
-        likes: await this.commentService.getLikeCount(id),
+      const responseData: any = {
+        comment: {
+          ...comment.toObject(),
+          counts: {
+            likes: await this.commentService.getLikeCount(id),
+            children: childCount,
+          },
+          ...(userId && { userInteraction }),
+        },
       };
 
       res.json(responseData);
@@ -88,16 +94,21 @@ export class CommentController {
 
       const commentsWithCounts = await Promise.all(
         result.comments.map(async (comment) => {
-          const commentData: any = {
+          const [counts, userInteraction] = await Promise.all([
+            {
+              likes: await this.commentService.getLikeCount(comment._id.toString()),
+              children: await this.commentService.getChildCommentCount(comment._id.toString()),
+            },
+            userId ? {
+              isLiked: await this.commentService.hasUserLiked(comment._id.toString(), userId),
+            } : {},
+          ]);
+
+          return {
             ...comment.toObject(),
-            likesCount: comment.likes.length,
+            counts,
+            ...(userId && { userInteraction }),
           };
-
-          if (userId) {
-            commentData.hasLiked = await this.commentService.hasUserLiked(comment._id.toString(), userId);
-          }
-
-          return commentData;
         }),
       );
 
@@ -113,6 +124,7 @@ export class CommentController {
   getReplies = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { parentCommentId } = req.params;
+      const { page = '1', limit = '10' } = req.query;
       const userId = req.user?.userId;
 
       if (!parentCommentId) {
@@ -120,24 +132,39 @@ export class CommentController {
         return;
       }
 
-      const replies = await this.commentService.getRepliesByParentId(parentCommentId);
+      const pageNum = parseInt(page as string, 10);
+      const limitNum = parseInt(limit as string, 10);
+
+      if (pageNum < 1 || limitNum < 1 || limitNum > 100) {
+        res.status(400).json({ message: 'Invalid pagination parameters' });
+        return;
+      }
+
+      const result = await this.commentService.getRepliesByParentId(parentCommentId, pageNum, limitNum);
 
       const repliesWithCounts = await Promise.all(
-        replies.map(async (reply) => {
-          const replyData: any = {
+        result.replies.map(async (reply) => {
+          const [counts, userInteraction] = await Promise.all([
+            {
+              likes: await this.commentService.getLikeCount(reply._id.toString()),
+            },
+            userId ? {
+              isLiked: await this.commentService.hasUserLiked(reply._id.toString(), userId),
+            } : {},
+          ]);
+
+          return {
             ...reply.toObject(),
-            likesCount: reply.likes.length,
+            counts,
+            ...(userId && { userInteraction }),
           };
-
-          if (userId) {
-            replyData.hasLiked = await this.commentService.hasUserLiked(reply._id.toString(), userId);
-          }
-
-          return replyData;
         }),
       );
 
-      res.json({ replies: repliesWithCounts });
+      res.json({
+        ...result,
+        replies: repliesWithCounts,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

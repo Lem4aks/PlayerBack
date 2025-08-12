@@ -7,14 +7,14 @@ export class CommentService {
   async createComment(commentData: IComment): Promise<ICommentDocument> {
     const comment = new Comment(commentData);
     const savedComment = await comment.save();
-
-    if (commentData.postId) {
-      await Post.findByIdAndUpdate(
-          commentData.postId,
-          { $push: { comments: savedComment._id } },
-      );
+    const populatedComment = await Comment.findById(savedComment._id)
+        .populate('userId', 'username name');
+    
+    if (!populatedComment) {
+      throw new Error('Failed to create comment');
     }
-    return savedComment;
+    
+    return populatedComment;
   }
 
   async getCommentById(id: string): Promise<ICommentDocument | null> {
@@ -45,10 +45,23 @@ export class CommentService {
     };
   }
 
-  async getRepliesByParentId(parentCommentId: string): Promise<ICommentDocument[]> {
-    return await Comment.find({ parentCommentId })
+  async getRepliesByParentId(parentCommentId: string, page: number = 1, limit: number = 10): Promise<{ replies: ICommentDocument[], totalCount: number, totalPages: number }> {
+    const skip = (page - 1) * limit;
+
+    const totalCount = await Comment.countDocuments({ parentCommentId });
+    const totalPages = Math.ceil(totalCount / limit);
+
+    const replies = await Comment.find({ parentCommentId })
         .populate('userId', 'username name')
-        .sort({ createdAt: 1 });
+        .sort({ createdAt: 1 })
+        .skip(skip)
+        .limit(limit);
+
+    return {
+      replies,
+      totalCount,
+      totalPages
+    };
   }
 
   async updateComment(id: string, updateData: Partial<IComment>): Promise<ICommentDocument | null> {
@@ -59,13 +72,6 @@ export class CommentService {
   async deleteComment(id: string): Promise<boolean> {
     const comment = await Comment.findById(id);
     if (!comment) return false;
-
-    if (comment.postId) {
-      await Post.findByIdAndUpdate(
-          comment.postId,
-          { $pull: { comments: id } },
-      );
-    }
 
     await Comment.deleteMany({ parentCommentId: id });
 
@@ -99,5 +105,9 @@ export class CommentService {
   async getLikeCount(commentId: string): Promise<number> {
     const comment = await Comment.findById(commentId).select('likes');
     return comment ? comment.likes.length : 0;
+  }
+
+  async getChildCommentCount(parentCommentId: string): Promise<number> {
+    return await Comment.countDocuments({ parentCommentId });
   }
 }

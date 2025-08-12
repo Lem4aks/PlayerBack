@@ -19,7 +19,6 @@ export interface IPost {
   description?: string;
   src?: string;
   content?: string;
-  comments: mongoose.Types.ObjectId[];
   likes: mongoose.Types.ObjectId[];
   views: mongoose.Types.ObjectId[];
   createdAt?: Date;
